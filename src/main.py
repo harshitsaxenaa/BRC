@@ -10,7 +10,7 @@ def main():
 
     with open(input_path, "rb") as f:
         mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        lines = mm.read().split(b"\n")
+        lines = mm.read().split(b" \n")
 
     city_stats = {}
 
