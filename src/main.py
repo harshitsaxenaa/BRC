@@ -1,39 +1,47 @@
 from math import ceil
 
-def round_up(x):
+def round1(x):
     return ceil(x * 10) / 10
 
 def main():
-    input_file = "testcase.txt"
-    output_file = "output.txt"
+    import os
 
     city_stats = {}
+    read = os.read
+    write = os.write
+    fd_in = os.open("testcase.txt", os.O_RDONLY)
+    data = read(fd_in, os.path.getsize("testcase.txt")).splitlines()
+    os.close(fd_in)
 
-    with open(input_file, "r") as f:
-        for line in f:
-            sep = line.find(";")
-            if sep == -1:
-                continue
-            city = line[:sep]
-            try:
-                score = float(line[sep + 1:])
-            except ValueError:
-                continue
+    for line in data:
+        sep = line.find(b";")
+        if sep == -1:
+            continue
+        city = line[:sep]
+        try:
+            score = float(line[sep+1:])
+        except:
+            continue
 
-            if city in city_stats:
-                stats = city_stats[city]
-                if score < stats[0]: stats[0] = score     
-                stats[1] += score                          
-                if score > stats[2]: stats[2] = score     
-                stats[3] += 1
-            else:
-                city_stats[city] = [score, score, score, 1]
+        if city in city_stats:
+            stat = city_stats[city]
+            if score < stat[0]: stat[0] = score
+            stat[1] += score
+            if score > stat[2]: stat[2] = score
+            stat[3] += 1
+        else:
+            city_stats[city] = [score, score, score, 1]
 
-    with open(output_file, "w") as f:
-        for city in sorted(city_stats):
-            mn, sm, mx, cnt = city_stats[city]
-            mean = sm / cnt
-            f.write(f"{city}={round_up(mn):.1f}/{round_up(mean):.1f}/{round_up(mx):.1f}\n")
+    out = bytearray()
+    for city in sorted(city_stats):
+        mn, sm, mx, cnt = city_stats[city]
+        mean = sm / cnt
+        out += city + b"=" + \
+               f"{round1(mn):.1f}/{round1(mean):.1f}/{round1(mx):.1f}\n".encode()
+
+    fd_out = os.open("output.txt", os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+    write(fd_out, out)
+    os.close(fd_out)
 
 if __name__ == "__main__":
     main()
