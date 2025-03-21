@@ -1,40 +1,38 @@
 import math
 
 def round_up(value):
-    
     return math.ceil(value * 10) / 10
 
 def main():
     input_file = "testcase.txt"
     output_file = "output.txt"
-    
+
     city_data = {}
 
     with open(input_file, "r") as f:
         for line in f:
-            line = line.strip()
-            if not line:
+            if ";" not in line:
                 continue
+            parts = line.rstrip().split(";")
+            if len(parts) != 2:
+                continue
+            city, score_str = parts
             try:
-                city, score = line.split(";")
-                score = float(score)
-                if city not in city_data:
-                    city_data[city] = []
-                city_data[city].append(score)
+                score = float(score_str)
             except ValueError:
-                continue  
+                continue
+            city_data.setdefault(city, []).append(score)
 
-    result_lines = []
-    for city in sorted(city_data.keys()):
-        values = city_data[city]
-        min_val = round_up(min(values))
-        mean_val = round_up(sum(values) / len(values))
-        max_val = round_up(max(values))
-        result_lines.append(f"{city}={min_val:.1f}/{mean_val:.1f}/{max_val:.1f}")
+    result = [
+        f"{city}="
+        f"{round_up(min(scores)):.1f}/"
+        f"{round_up(sum(scores)/len(scores)):.1f}/"
+        f"{round_up(max(scores)):.1f}"
+        for city, scores in sorted(city_data.items())
+    ]
 
     with open(output_file, "w") as f:
-        for line in result_lines:
-            f.write(line + "\n")
+        f.write("\n".join(result) + "\n")
 
 if __name__ == "__main__":
     main()
