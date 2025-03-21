@@ -1,32 +1,38 @@
-from collections import defaultdict
 from math import ceil
 
-def round_up(val):
-    return ceil(val * 10) / 10
+def round_up(x):
+    return ceil(x * 10) / 10
 
 def main():
-    city_scores = defaultdict(list)
+    import sys
+    read = sys.stdin.read
+    write = sys.stdout.write
 
-    with open("testcase.txt", "r") as infile:
-        for line in infile:
-            if ";" not in line:
-                continue
-            parts = line.split(";")
-            if len(parts) != 2:
-                continue
-            city, score = parts
-            try:
-                city_scores[city].append(float(score))
-            except ValueError:
-                continue  # Skip lines with invalid scores
+    city_stats = {}
 
-    result = [
-        f"{city}={round_up(min(scores)):.1f}/{round_up(sum(scores)/len(scores)):.1f}/{round_up(max(scores)):.1f}"
-        for city, scores in sorted(city_scores.items())
-    ]
+    for line in read().splitlines():
+        sep = line.find(";")
+        if sep == -1:
+            continue
+        city = line[:sep]
+        try:
+            score = float(line[sep+1:])
+        except ValueError:
+            continue
 
-    with open("output.txt", "w") as outfile:
-        outfile.write("\n".join(result) + "\n")
+        if city in city_stats:
+            stats = city_stats[city]
+            if score < stats[0]: stats[0] = score     # min
+            stats[1] += score                          # sum
+            if score > stats[2]: stats[2] = score     # max
+            stats[3] += 1
+        else:
+            city_stats[city] = [score, score, score, 1]
+
+    for city in sorted(city_stats):
+        mn, sm, mx, cnt = city_stats[city]
+        mean = sm / cnt
+        write(f"{city}={round_up(mn):.1f}/{round_up(mean):.1f}/{round_up(mx):.1f}\n")
 
 if __name__ == "__main__":
     main()
