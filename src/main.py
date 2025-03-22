@@ -1,88 +1,103 @@
-from math import ceil
+import os
 import mmap
+import math
 import multiprocessing
-from collections import defaultdict
+
+
+def compute_line_block(chunk):
+    city_map = {}
+
+    for line in chunk.split(b'\n'):
+        if not line:
+            continue
+        split_at = line.find(b';')
+        if split_at == -1:
+            continue
+
+        city = line[:split_at]
+        try:
+            value = float(line[split_at + 1:])
+        except:
+            continue
+
+        if city not in city_map:
+            city_map[city] = [value, value, value, 1]
+        else:
+            cur = city_map[city]
+            cur[0] = min(cur[0], value)  # min
+            cur[1] = max(cur[1], value)  # max
+            cur[2] += value              # sum
+            cur[3] += 1                  # count
+
+    return city_map
+
+
+def process_chunk(file_path, begin, end):
+    with open(file_path, 'rb') as f:
+        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+        size = len(mm)
+
+        if begin != 0:
+            while begin < size and mm[begin] != ord('\n'):
+                begin += 1
+            begin += 1
+
+        if end < size:
+            while end < size and mm[end] != ord('\n'):
+                end += 1
+            end += 1
+
+        chunk = mm[begin:end]
+        mm.close()
+
+    return compute_line_block(chunk)
+
+
+def combine_maps(maps):
+    final_map = {}
+    for part in maps:
+        for city, stat in part.items():
+            if city not in final_map:
+                final_map[city] = stat[:]
+            else:
+                existing = final_map[city]
+                existing[0] = min(existing[0], stat[0])
+                existing[1] = max(existing[1], stat[1])
+                existing[2] += stat[2]
+                existing[3] += stat[3]
+    return final_map
+
 
 def round1(x):
-    return ceil(x * 10) / 10
-
-def initialize_stats():
-    return [float("inf"), 0.0, float("-inf"), 0]
-
-def split_file(filename, num_chunks):
-    with open(filename, "rb") as f:
-        mmapped = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        file_size = mmapped.size()
-        chunk_size = file_size // num_chunks
-        offsets = [0]
-        for i in range(1, num_chunks):
-            mmapped.seek(i * chunk_size)
-            mmapped.readline() 
-            offsets.append(mmapped.tell())
-        offsets.append(file_size)
-    return offsets
-
-def process_chunking(start, end, filename):
-    city_stats = defaultdict(initialize_stats)
-    with open(filename, "rb") as f:
-        mmapped = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        mmapped.seek(start)
-
-        while mmapped.tell() < end:
-            line = mmapped.readline()
-            if not line:
-                break
-            sep = line.find(b";")
-            if sep == -1:
-                continue
-            city = line[:sep]
-            try:
-                score = float(line[sep + 1:])
-            except ValueError:
-                continue
-            stats = city_stats[city]
-            stats[0] = min(stats[0], score)  
-            stats[1] += score               
-            stats[2] = max(stats[2], score) 
-            stats[3] += 1                   
-    return city_stats
-
-def merging_of_stats(global_stats, partial_stats):
-    for city, stats in partial_stats.items():
-        if city in global_stats:
-            agg = global_stats[city]
-            agg[0] = min(agg[0], stats[0])  
-            agg[1] += stats[1]              
-            agg[2] = max(agg[2], stats[2])  
-            agg[3] += stats[3]              
-        else:
-            global_stats[city] = stats
+    return math.ceil(x * 10) / 10
 
 
+def process_file(input_file="testcase.txt", output_file="output.txt"):
+    with open(input_file, "rb") as f:
+        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+        size = len(mm)
+        mm.close()
 
-def write_results_to_file(global_stats, output_file):
-    with open(output_file, "w") as f:
-        for city, (mn, sm, mx, cnt) in sorted(global_stats.items()):
-            mean = sm / cnt
-            f.write(f"{city.decode('ascii')}={round1(mn):.1f}/{round1(mean):.1f}/{round1(mx):.1f}\n")
+    num_chunks = multiprocessing.cpu_count() * 2
+    step = size // num_chunks
+    segments = []
 
-def main():
-    input_filename = "testcase.txt"
-    output_filename = "output.txt"
-    num_processes = multiprocessing.cpu_count()
-    offsets = split_file(input_filename, num_processes)
+    for i in range(num_chunks):
+        start = i * step
+        end = (i + 1) * step if i != num_chunks - 1 else size
+        segments.append((input_file, start, end))
 
-    with multiprocessing.Pool(num_processes) as pool:
-        chunk_results = pool.starmap(
-            process_chunking,
-            [(offsets[i], offsets[i + 1], input_filename) for i in range(len(offsets) - 1)]
-        )
+    with multiprocessing.Pool(num_chunks) as pool:
+        maps = pool.starmap(process_chunk, segments)
 
-    global_stats = defaultdict(initialize_stats)
-    for partial_stats in chunk_results:
-        merging_of_stats(global_stats, partial_stats)
+    final_result = combine_maps(maps)
 
-    write_results_to_file(global_stats, output_filename)
+    with open(output_file, "wb") as f:
+        for city in sorted(final_result.keys(), key=lambda x: x.decode()):
+            mn, mx, sm, ct = final_result[city]
+            mean = sm / ct
+            f.write(f"{city.decode()}={round1(mn):.1f}/{round1(mean):.1f}/{round1(mx):.1f}\n".encode())
+
 
 if __name__ == "__main__":
-    main()
+    process_file()
