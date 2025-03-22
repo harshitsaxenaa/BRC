@@ -1,52 +1,33 @@
-import os
-import mmap
-from math import ceil
-
-def round1(x):
-    return ceil(x * 10) / 10
-
 def main():
-    city_stats = {}
-    stat_get = city_stats.get
+    import sys
 
-    with open("testcase.txt", "rb") as f:
-        mmapped = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        lines = bytes(mmapped).split(b"\n")  
+    stats = {}
 
-    for line in lines:
-        sep = line.find(b";")
-        if sep == -1:
-            continue
-        city = line[:sep]
-        try:
-            score = float(line[sep + 1:])
-        except:
-            continue
+    with open("input.txt", "rb", buffering=2**20) as f:
+        for line in f:
+            try:
+                sep = line.index(b";")
+                city = line[:sep]
+                temp = float(line[sep+1:].strip())
 
-        stat = stat_get(city)
-        if stat:
-            if score < stat[0]: stat[0] = score
-            stat[1] += score
-            if score > stat[2]: stat[2] = score
-            stat[3] += 1
-        else:
-            city_stats[city] = [score, score, score, 1]
+                if city in stats:
+                    mn, mx, s, c = stats[city]
+                    if temp < mn:
+                        mn = temp
+                    if temp > mx:
+                        mx = temp
+                    stats[city] = (mn, mx, s + temp, c + 1)
+                else:
+                    stats[city] = (temp, temp, temp, 1)
 
-    result = []
-    for city in sorted(city_stats):
-        mn, sm, mx, cnt = city_stats[city]
-        mean = sm / cnt
-        result.append(
-            b"%s=%.1f/%.1f/%.1f\n" % (
-                city,
-                round1(mn),
-                round1(mean),
-                round1(mx)
-            )
-        )
+            except Exception:
+                continue  # skip malformed lines
 
-    with open("output.txt", "wb") as f:
-        f.write(b"".join(result))
+    with open("output.txt", "w", buffering=2**20) as out:
+        for city in sorted(stats):
+            mn, mx, s, c = stats[city]
+            mean = s / c
+            out.write(f"{city.decode()}={mn:.1f}/{mean:.1f}/{mx:.1f}\n")
 
 if __name__ == "__main__":
     main()
