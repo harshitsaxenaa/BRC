@@ -1,11 +1,11 @@
 import os
 import mmap
 import multiprocessing
-from math import ceil
+from decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict
 
 def round1(x):
-    return ceil(x * 10) / 10
+    return float(Decimal(x).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
 
 def process_chunk(args):
     data, start, end = args
