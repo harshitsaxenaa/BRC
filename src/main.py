@@ -1,62 +1,64 @@
-import mmap
-from collections import defaultdict
 from math import ceil
+from multiprocessing import Pool, Manager
 
 def round1(x):
     return ceil(x * 10) / 10
 
-def parse_score(score_bytes):
-    val = 0
-    i = 0
-    while i < len(score_bytes) and score_bytes[i] != 46:  # ord('.') == 46
-        val = val * 10 + (score_bytes[i] - 48)
-        i += 1
-    i += 1  # skip '.'
-    if i < len(score_bytes):
-        val = val * 10 + (score_bytes[i] - 48)
-    else:
-        val *= 10
-    return val
+def process_chunk(lines):
+    city_stats = {}
+    for line in lines:
+        sep = line.find(";")
+        if sep == -1:
+            continue
+        city = line[:sep]
+        try:
+            score = float(line[sep + 1:])
+        except ValueError:
+            continue
+
+        if city in city_stats:
+            stat = city_stats[city]
+            stat[0] = min(stat[0], score)
+            stat[1] += score
+            stat[2] = max(stat[2], score)
+            stat[3] += 1
+        else:
+            city_stats[city] = [score, score, score, 1]
+    return city_stats
+
+def merge_stats(aggregated_stats, partial_stats):
+    for city, stats in partial_stats.items():
+        if city in aggregated_stats:
+            agg = aggregated_stats[city]
+            agg[0] = min(agg[0], stats[0])  # Min
+            agg[1] += stats[1]             # Sum
+            agg[2] = max(agg[2], stats[2]) # Max
+            agg[3] += stats[3]             # Count
+        else:
+            aggregated_stats[city] = stats
 
 def main():
-    stats = defaultdict(lambda: [1000000, 0, -1, 0])  # min, sum, max, count
+    # Step 1: Read the file and split into chunks
+    with open("testcase.txt", "r", buffering=64 * 1024) as f:
+        lines = f.readlines()
+    num_processes = 4  # Adjust based on the number of CPU cores
+    chunk_size = len(lines) // num_processes
+    chunks = [lines[i:i + chunk_size] for i in range(0, len(lines), chunk_size)]
 
-    with open("testcase.txt", "rb") as f:
-        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        readline = mm.readline
+    # Step 2: Use multiprocessing to process chunks
+    with Pool(num_processes) as pool:
+        partial_results = pool.map(process_chunk, chunks)
 
-        while True:
-            line = readline()
-            if not line:
-                break
-            sep = line.find(b";")
-            if sep == -1:
-                continue
-            city = line[:sep]
-            score_bytes = line[sep+1:].strip()
-            try:
-                score = parse_score(score_bytes)
-            except:
-                continue
-            s = stats[city]
-            if score < s[0]: s[0] = score
-            s[1] += score
-            if score > s[2]: s[2] = score
-            s[3] += 1
+    # Step 3: Merge partial results
+    aggregated_stats = {}
+    for partial_stats in partial_results:
+        merge_stats(aggregated_stats, partial_stats)
 
-    output = bytearray()
-    for city in sorted(stats):
-        mn, sm, mx, cnt = stats[city]
-        mean = (sm + cnt // 2) // cnt  # rounded
-        output.extend(city)
-        output.extend(b"=%.1f/%.1f/%.1f\n" % (
-            round1(mn / 10),
-            round1(mean / 10),
-            round1(mx / 10)
-        ))
-
-    with open("output.txt", "wb") as f:
-        f.write(output)
+    # Step 4: Write results to the output file
+    with open("output.txt", "w", buffering=64 * 1024) as f:
+        for city, (mn, sm, mx, cnt) in sorted(aggregated_stats.items()):
+            mean = sm / cnt
+            f.write(f"{city}={round1(mn):.1f}/{round1(mean):.1f}/{round1(mx):.1f}\n")
 
 if __name__ == "__main__":
     main()
